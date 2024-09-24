@@ -1,65 +1,118 @@
 
-#include <iostream>
-#include <vector>
-#include <string>
-#include <chrono>
-#include <thread>
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#include <stdio.h>
+#include <GLFW/glfw3.h>
 
-// Struct to represent a single frame of inputs
-struct Frame {
-    int frame_number;
-    std::vector<std::string> keys_pressed;
-};
+void render_gui();
 
-// Class to handle input simulation and frame playback
-class InputSimulator {
-public:
-    InputSimulator(int fps) : frames_per_second(fps) {}
+// Input simulation state
+bool is_playing = false;
+bool is_paused = false;
 
-    void addInput(int frame_number, const std::string& key) {
-        ensureFrameExists(frame_number);
-        frames[frame_number].keys_pressed.push_back(key);
+// Main function for setting up GLFW and ImGui
+int main(int, char**)
+{
+    // Setup GLFW
+    if (!glfwInit())
+        return -1;
+
+    // Create a windowed mode window and its OpenGL context
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Input Simulator", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
+
+    // Setup ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 130");
+
+    // Main loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // Poll events
+        glfwPollEvents();
+
+        // Start ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // Render the GUI
+        render_gui();
+
+        // Rendering
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(0.45f, 0.55f, 0.60f, 1.00f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(window);
     }
 
-    void playback() {
-        for (const auto& frame : frames) {
-            std::cout << "Frame " << frame.frame_number << ": ";
-            for (const auto& key : frame.keys_pressed) {
-                std::cout << key << " ";
-            }
-            std::cout << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000 / frames_per_second));
-        }
-    }
+    // Cleanup
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
-    void setFPS(int fps) {
-        frames_per_second = fps;
-    }
-
-private:
-    std::vector<Frame> frames;
-    int frames_per_second;
-
-    void ensureFrameExists(int frame_number) {
-        if (frames.size() <= frame_number) {
-            frames.resize(frame_number + 1);
-            frames[frame_number].frame_number = frame_number;
-        }
-    }
-};
-
-// Main program loop
-int main() {
-    int fps = 60; // default to 60 FPS
-    InputSimulator simulator(fps);
-
-    simulator.addInput(2, "U");
-    simulator.addInput(3, "D");
-    simulator.addInput(4, "L");
-    simulator.addInput(5, "R");
-
-    std::cout << "Starting playback at " << fps << " FPS..." << std::endl;
-    simulator.playback();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
     return 0;
+}
+
+// GUI rendering function
+void render_gui()
+{
+    ImGui::Begin("Input Simulator");
+
+    // Play button
+    if (ImGui::Button("Play"))
+    {
+        is_playing = true;
+        is_paused = false;
+    }
+
+    // Pause button
+    ImGui::SameLine();
+    if (ImGui::Button("Pause"))
+    {
+        if (is_playing) is_paused = true;
+    }
+
+    // Stop button
+    ImGui::SameLine();
+    if (ImGui::Button("Stop"))
+    {
+        is_playing = false;
+        is_paused = false;
+    }
+
+    // Display current status
+    if (is_playing && !is_paused)
+        ImGui::Text("Status: Playing");
+    else if (is_paused)
+        ImGui::Text("Status: Paused");
+    else
+        ImGui::Text("Status: Stopped");
+
+    ImGui::Separator();
+
+    // Placeholder for Input Table
+    ImGui::Text("Input Table (under development)");
+
+    ImGui::End();
 }
