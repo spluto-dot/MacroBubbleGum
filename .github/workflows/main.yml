@@ -1,4 +1,3 @@
-
 name: C++ Windows Build
 
 on:
@@ -15,7 +14,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Setup C++ Compiler on Windows
       run: choco install mingw
@@ -25,7 +24,7 @@ jobs:
         g++ input_simulator.cpp -o input_simulator.exe
 
     - name: Upload artifact (Windows)
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: input_simulator_windows
         path: ./input_simulator.exe
