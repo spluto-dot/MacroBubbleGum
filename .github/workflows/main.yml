@@ -1,5 +1,5 @@
 
-name: C++ Windows Build
+name: C++ ImGui Windows Build
 
 on:
   push:
@@ -20,12 +20,29 @@ jobs:
     - name: Setup C++ Compiler on Windows
       run: choco install mingw
 
-    - name: Compile the Code with static linking
+    - name: Install Dependencies (GLFW)
       run: |
-        g++ input_simulator.cpp -o input_simulator.exe -static
+        git clone https://github.com/glfw/glfw.git
+        cd glfw
+        cmake -G "MinGW Makefiles" .
+        mingw32-make
+        cd ..
+
+    - name: Install Dependencies (ImGui)
+      run: |
+        git clone https://github.com/ocornut/imgui.git
+        cd imgui
+        git clone https://github.com/ocornut/imgui.git
+        cd imgui/backends
+        git clone https://github.com/glfw/glfw.git
+        cd ../..
+
+    - name: Compile the Code with ImGui and GLFW
+      run: |
+        g++ -Iglfw/include -Iimgui -Iimgui/backends input_simulator_imgui.cpp -o input_simulator.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
 
     - name: Upload artifact (Windows)
       uses: actions/upload-artifact@v3
       with:
-        name: input_simulator_windows
+        name: input_simulator_imgui_windows
         path: ./input_simulator.exe
