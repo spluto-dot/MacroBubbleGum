@@ -39,7 +39,7 @@ jobs:
 
     - name: Compile the Code with ImGui and GLFW
       run: |
-        g++ -Iglfw/include -Iimgui -Iimgui/backends input_simulator_imgui.cpp -o input_simulator.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
+        g++ -Iglfw/include -Iimgui -Iimgui/backends ./input_simulator_imgui.cpp -o input_simulator.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
 
     - name: Upload artifact (Windows)
       uses: actions/upload-artifact@v3
