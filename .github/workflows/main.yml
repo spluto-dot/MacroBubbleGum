@@ -20,9 +20,9 @@ jobs:
     - name: Setup C++ Compiler on Windows
       run: choco install mingw
 
-    - name: Compile the Code
+    - name: Compile the Code with static linking
       run: |
-        g++ input_simulator.cpp -o input_simulator.exe
+        g++ input_simulator.cpp -o input_simulator.exe -static
 
     - name: Upload artifact (Windows)
       uses: actions/upload-artifact@v3
