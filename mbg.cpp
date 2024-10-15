@@ -8,6 +8,42 @@
 bool is_playing = false; // Estado para saber se está rodando
 bool is_paused = false; // Estado para saber se está pausado
 
+// Função para renderizar a interface gráfica
+void render_gui()
+{
+    ImGui::Begin("MacroBubbleGum");
+
+    // Botões de controle de simulação (Play, Pause, Stop)
+    if (ImGui::Button("Play")) {
+        is_playing = true;
+        is_paused = false;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Pause")) {
+        if (is_playing) is_paused = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stop")) {
+        is_playing = false;
+        is_paused = false;
+    }
+
+    // Exibe o status atual (rodando, pausado ou parado)
+    if (is_playing && !is_paused)
+        ImGui::Text("Status: Playing");
+    else if (is_paused)
+        ImGui::Text("Status: Paused");
+    else
+        ImGui::Text("Status: Stopped");
+
+    ImGui::Separator();
+
+    // Espaço reservado para Tabela de Inputs (em desenvolvimento)
+    ImGui::Text("Tabela de Inputs (em desenvolvimento)");
+
+    ImGui::End();
+}
+
 // Função principal para configurar o GLFW e o ImGui
 int main(int, char**)
 {
@@ -67,40 +103,4 @@ int main(int, char**)
     glfwTerminate();
 
     return 0;
-}
-
-// Função que renderiza a interface gráfica
-void render_gui()
-{
-    ImGui::Begin("MacroBubbleGum");
-
-    // Botões de controle de simulação (Play, Pause, Stop)
-    if (ImGui::Button("Play")) {
-        is_playing = true;
-        is_paused = false;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Pause")) {
-        if (is_playing) is_paused = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Stop")) {
-        is_playing = false;
-        is_paused = false;
-    }
-
-    // Exibe o status atual (rodando, pausado ou parado)
-    if (is_playing && !is_paused)
-        ImGui::Text("Status: Playing");
-    else if (is_paused)
-        ImGui::Text("Status: Paused");
-    else
-        ImGui::Text("Status: Stopped");
-
-    ImGui::Separator();
-
-    // Espaço reservado para Tabela de Inputs (em desenvolvimento)
-    ImGui::Text("Tabela de Inputs (em desenvolvimento)");
-
-    ImGui::End();
 }
