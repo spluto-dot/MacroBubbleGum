@@ -1,4 +1,3 @@
-
 name: C++ MBG Windows Build
 
 on:
@@ -20,22 +19,14 @@ jobs:
     - name: Setup C++ Compiler on Windows
       run: choco install mingw
 
-    - name: Install Dependencies (GLFW)
+    - name: Install Dependencies (GLFW and ImGui)
       run: |
         git clone https://github.com/glfw/glfw.git
+        git clone https://github.com/ocornut/imgui.git
         cd glfw
         cmake -G "MinGW Makefiles" .
         mingw32-make
         cd ..
-
-    - name: Install Dependencies (ImGui)
-      run: |
-        git clone https://github.com/ocornut/imgui.git
-        cd imgui
-        git clone https://github.com/glfw/glfw.git
-        cd imgui/backends
-        git clone https://github.com/glfw/glfw.git
-        cd ../..
 
     - name: Compile the Code with ImGui and GLFW, including .rc for Icon
       run: |
