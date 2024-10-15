@@ -1,3 +1,4 @@
+
 name: C++ MBG Windows Build
 
 on:
@@ -28,10 +29,10 @@ jobs:
         mingw32-make
         cd ..
 
-    - name: Compile the Code with ImGui and GLFW, including .rc for Icon
+    - name: Compile Resource File and Application
       run: |
-        echo 'IDI_ICON1 ICON "MacroBubbleGum.ico"' > mbg.rc
-        g++ -Iglfw/include -Iimgui -Iimgui/backends mbg.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp mbg.rc -o MacroBubbleGum.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
+        windres mbg.rc -o mbg_res.o
+        g++ -Iglfw/include -Iimgui -Iimgui/backends mbg.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp mbg_res.o -o MacroBubbleGum.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
 
     - name: Upload artifact (Windows)
       uses: actions/upload-artifact@v3
