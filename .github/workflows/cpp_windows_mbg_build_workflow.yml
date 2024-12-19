@@ -1,0 +1,41 @@
+
+name: C++ MBG Windows Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup C++ Compiler on Windows
+      run: choco install mingw
+
+    - name: Install Dependencies (GLFW and ImGui)
+      run: |
+        git clone https://github.com/glfw/glfw.git
+        git clone https://github.com/ocornut/imgui.git
+        cd glfw
+        cmake -G "MinGW Makefiles" .
+        mingw32-make
+        cd ..
+
+    - name: Compile Resource File and Application
+      run: |
+        windres mbg.rc -o mbg_res.o
+        g++ -Iglfw/include -Iimgui -Iimgui/backends mbg.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp mbg_res.o -o MacroBubbleGum.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
+
+    - name: Upload artifact (Windows)
+      uses: actions/upload-artifact@v3
+      with:
+        name: MacroBubbleGum_windows_build
+        path: ./MacroBubbleGum.exe
