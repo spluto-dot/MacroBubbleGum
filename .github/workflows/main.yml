@@ -19,7 +19,7 @@ jobs:
 
       - name: Build Project
         run: |
-          cl /EHsc /FeMacroBubbleGum.exe main.c
+          cl /EHsc /FeMacroBubbleGum.exe main.c User32.lib
       - name: Upload Executable
         uses: actions/upload-artifact@v3
         with:
