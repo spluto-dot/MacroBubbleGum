@@ -1,0 +1,27 @@
+name: Build MacroBubbleGum
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build Project
+        run: |
+          cl /EHsc /FeMacroBubbleGum.exe main.c
+      - name: Upload Executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: MacroBubbleGum
+          path: MacroBubbleGum.exe
