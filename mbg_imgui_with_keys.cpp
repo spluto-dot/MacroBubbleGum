@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <GLFW/glfw3.h>
+#include <windows.h> // Para capturar teclas
 
 // Estrutura para representar cada entrada de tecla e a duracao em frames
 struct InputEntry {
@@ -14,6 +15,34 @@ struct InputEntry {
 };
 
 std::vector<InputEntry> inputs; // Vetor para armazenar as entradas de tecla
+bool is_recording = false;      // Flag para saber se está gravando
+
+// Mapear as teclas para nomes legíveis
+std::string getKeyName(int vk_code) {
+    switch (vk_code) {
+        case VK_UP: return "UP";
+        case VK_DOWN: return "DOWN";
+        case VK_LEFT: return "LEFT";
+        case VK_RIGHT: return "RIGHT";
+        case 'A': return "A";
+        case 'B': return "B";
+        case 'X': return "X";
+        case 'Y': return "Y";
+        default: return "UNKNOWN";
+    }
+}
+
+// Capturar inputs do teclado
+void captureInputs() {
+    for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
+        if (GetAsyncKeyState(vk_code) & 0x8000) {
+            std::string key_name = getKeyName(vk_code);
+            if (!key_name.empty() && (inputs.empty() || inputs.back().key != key_name)) {
+                inputs.push_back({key_name, 1}); // Adiciona a tecla pressionada com 1 frame
+            }
+        }
+    }
+}
 
 // Funcao para salvar os inputs em um arquivo
 void saveInputsToFile() {
@@ -35,55 +64,33 @@ void saveInputsToFile() {
 void render_gui() {
     ImGui::Begin("MacroBubbleGum");
 
-    // Define um array de teclas disponiveis
-    static const char* keys[] = { "UP", "DOWN", "LEFT", "RIGHT", "A", "B", "X", "Y" };
-    static int current_key = 0; // Tecla atualmente selecionada
-    static int frame_count = 1; // Numero de frames que a tecla ficara ativa
-
-    // Botoes de controle de simulacao (Play, Pause, Stop)
-    if (ImGui::Button("Play")) {
-        is_playing = true;
-        is_paused = false;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Pause")) {
-        if (is_playing) is_paused = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Stop")) {
-        is_playing = false;
-        is_paused = false;
-        saveInputsToFile(); // Salvar inputs ao parar
+    // Botao de gravacao
+    if (!is_recording) {
+        if (ImGui::Button("Gravar")) {
+            is_recording = true;
+            inputs.clear();
+            printf("Gravacao iniciada\n");
+        }
+    } else {
+        if (ImGui::Button("Parar")) {
+            is_recording = false;
+            saveInputsToFile();
+            printf("Gravacao parada\n");
+        }
     }
 
-    // Exibe o status atual (rodando, pausado ou parado)
-    if (is_playing && !is_paused)
-        ImGui::Text("Status: Playing");
-    else if (is_paused)
-        ImGui::Text("Status: Paused");
+    ImGui::Separator();
+
+    // Exibe o status atual
+    if (is_recording)
+        ImGui::Text("Status: Gravando");
     else
-        ImGui::Text("Status: Stopped");
-
-    ImGui::Separator();
-
-    // Secao para selecionar uma tecla e definir o numero de frames
-    ImGui::Text("Selecione a Tecla e o Numero de Frames");
-    ImGui::Combo("Tecla", &current_key, keys, IM_ARRAYSIZE(keys));
-    ImGui::InputInt("Frames", &frame_count);
-    if (frame_count < 1) frame_count = 1;
-
-    // Adiciona a tecla a lista de inputs
-    if (ImGui::Button("Adicionar Tecla")) {
-        inputs.push_back({ keys[current_key], frame_count });
-    }
-
-    ImGui::Separator();
-
-    // Exibe a lista de inputs
-    ImGui::Text("Lista de Inputs:");
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        ImGui::Text("Tecla: %s | Frames: %d", inputs[i].key.c_str(), inputs[i].frames);
-    }
+        ImGui::Text("Status: Parado");
 
     ImGui::End();
+
+    // Captura inputs enquanto grava
+    if (is_recording) {
+        captureInputs();
+    }
 }
