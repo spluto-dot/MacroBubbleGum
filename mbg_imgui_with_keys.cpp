@@ -42,20 +42,20 @@ void captureInputs() {
 
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         std::string key_name = getKeyName(vk_code);
-        if (GetAsyncKeyState(vk_code) & 0x8000) {
-            if (key_name != "UNKNOWN") {
+        if (key_name != "UNKNOWN") {
+            if (GetAsyncKeyState(vk_code) & 0x8000) {
+                // Tecla pressionada
                 if (active_keys.find(key_name) == active_keys.end()) {
-                    // Nova tecla pressionada
-                    active_keys[key_name] = now;
+                    active_keys[key_name] = now; // Registrar o momento em que a tecla foi pressionada
                 }
-            }
-        } else {
-            if (active_keys.find(key_name) != active_keys.end()) {
+            } else {
                 // Tecla liberada
-                auto press_time = active_keys[key_name];
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
-                inputs.push_back({key_name, static_cast<int>(duration)});
-                active_keys.erase(key_name);
+                if (active_keys.find(key_name) != active_keys.end()) {
+                    auto press_time = active_keys[key_name];
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
+                    inputs.push_back({key_name, static_cast<int>(duration)});
+                    active_keys.erase(key_name); // Remover a tecla do mapa de teclas ativas
+                }
             }
         }
     }
