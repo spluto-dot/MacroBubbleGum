@@ -41,8 +41,8 @@ void captureInputs() {
     auto now = std::chrono::steady_clock::now();
 
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
+        std::string key_name = getKeyName(vk_code);
         if (GetAsyncKeyState(vk_code) & 0x8000) {
-            std::string key_name = getKeyName(vk_code);
             if (key_name != "UNKNOWN") {
                 if (active_keys.find(key_name) == active_keys.end()) {
                     // Nova tecla pressionada
@@ -50,7 +50,6 @@ void captureInputs() {
                 }
             }
         } else {
-            std::string key_name = getKeyName(vk_code);
             if (active_keys.find(key_name) != active_keys.end()) {
                 // Tecla liberada
                 auto press_time = active_keys[key_name];
