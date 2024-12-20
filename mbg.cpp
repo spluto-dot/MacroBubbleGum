@@ -1,25 +1,26 @@
+#include "globals.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include <stdio.h>
 #include <GLFW/glfw3.h>
 
+// Definição das variáveis globais
 bool is_playing = false; // Estado para saber se está rodando
-bool is_paused = false; // Estado para saber se está pausado
+bool is_paused = false;  // Estado para saber se está pausado
 
-// Função para renderizar a interface gráfica
+// Declaração da função `render_gui` (implementada em outro arquivo)
 void render_gui();
 
 int main(int, char**)
 {
     // Inicializa o GLFW (para janelas e eventos de entrada)
-    if (!glfwInit())
+    if (!glfwInit()) {
         return -1;
+    }
 
     // Cria uma janela com contexto OpenGL
     GLFWwindow* window = glfwCreateWindow(1280, 720, "MacroBubbleGum", NULL, NULL);
-    if (!window)
-    {
+    if (!window) {
         glfwTerminate(); // Se a janela falhar, encerra o GLFW
         return -1;
     }
@@ -36,8 +37,7 @@ int main(int, char**)
     ImGui_ImplOpenGL3_Init("#version 130");
 
     // Loop principal da aplicação
-    while (!glfwWindowShouldClose(window))
-    {
+    while (!glfwWindowShouldClose(window)) {
         glfwPollEvents(); // Verifica eventos de entrada
 
         // Inicia uma nova frame do ImGui
@@ -45,7 +45,7 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // Função que renderiza a interface gráfica
+        // Renderiza a interface gráfica
         render_gui();
 
         // Renderiza o frame
