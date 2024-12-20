@@ -1,3 +1,4 @@
+#include "globals.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -6,17 +7,15 @@
 #include <string>
 #include <GLFW/glfw3.h>
 
-// Estrutura para representar cada entrada de tecla e a duração em frames
+// Estrutura para representar cada entrada de tecla e a duracao em frames
 struct InputEntry {
     std::string key;
     int frames;
 };
 
 std::vector<InputEntry> inputs; // Vetor para armazenar as entradas de tecla
-bool is_playing = false; // Estado para saber se está rodando
-bool is_paused = false; // Estado para saber se está pausado
 
-// Salvar os inputs em arquivo
+// Funcao para salvar os inputs em um arquivo
 void saveInputsToFile() {
     FILE* file = fopen("inputs.txt", "w");
     if (file) {
@@ -32,32 +31,16 @@ void saveInputsToFile() {
     }
 }
 
-void saveInputsToFile() {
-    FILE* file = fopen("inputs.txt", "w");
-    if (file) {
-        for (const auto& input : inputs) {
-            fprintf(file, "holdKey(\"%s\")\\n", input.key.c_str());
-            fprintf(file, "sleep(%d)\\n", input.frames);
-            fprintf(file, "releaseKey(\"%s\")\\n", input.key.c_str());
-        }
-        fclose(file);
-        printf("Inputs salvos em inputs.txt\\n");
-    } else {
-        printf("Erro ao salvar inputs!\\n");
-    }
-}
-
-// Função que renderiza a interface gráfica
-void render_gui()
-{
+// Funcao que renderiza a interface grafica
+void render_gui() {
     ImGui::Begin("MacroBubbleGum");
 
-    // Define um array de teclas disponíveis
+    // Define um array de teclas disponiveis
     static const char* keys[] = { "UP", "DOWN", "LEFT", "RIGHT", "A", "B", "X", "Y" };
     static int current_key = 0; // Tecla atualmente selecionada
-    static int frame_count = 1; // Número de frames que a tecla ficará ativa
+    static int frame_count = 1; // Numero de frames que a tecla ficara ativa
 
-    // Botões de controle de simulação (Play, Pause, Stop)
+    // Botoes de controle de simulacao (Play, Pause, Stop)
     if (ImGui::Button("Play")) {
         is_playing = true;
         is_paused = false;
@@ -83,13 +66,13 @@ void render_gui()
 
     ImGui::Separator();
 
-    // Seção para selecionar uma tecla e definir o número de frames
-    ImGui::Text("Selecione a Tecla e o Número de Frames");
+    // Secao para selecionar uma tecla e definir o numero de frames
+    ImGui::Text("Selecione a Tecla e o Numero de Frames");
     ImGui::Combo("Tecla", &current_key, keys, IM_ARRAYSIZE(keys));
     ImGui::InputInt("Frames", &frame_count);
     if (frame_count < 1) frame_count = 1;
 
-    // Adiciona a tecla à lista de inputs
+    // Adiciona a tecla a lista de inputs
     if (ImGui::Button("Adicionar Tecla")) {
         inputs.push_back({ keys[current_key], frame_count });
     }
