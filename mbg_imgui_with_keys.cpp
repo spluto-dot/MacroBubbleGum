@@ -19,6 +19,7 @@ std::vector<InputEntry> inputs; // Vetor para armazenar as entradas de tecla
 bool is_recording = false;      // Flag para saber se está gravando
 std::chrono::steady_clock::time_point last_input_time; // Tempo do ultimo input
 std::string last_key; // Ultima tecla pressionada
+bool is_key_down = false; // Indica se uma tecla está pressionada
 
 // Mapear as teclas para nomes legíveis
 std::string getKeyName(int vk_code) {
@@ -39,22 +40,33 @@ std::string getKeyName(int vk_code) {
 // Capturar inputs do teclado
 void captureInputs() {
     auto now = std::chrono::steady_clock::now();
+    bool any_key_pressed = false;
+
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         if (GetAsyncKeyState(vk_code) & 0x8000) {
             std::string key_name = getKeyName(vk_code);
-            if (!key_name.empty()) {
-                if (key_name != last_key) {
-                    // Salva o tempo da tecla anterior
-                    if (!last_key.empty()) {
-                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_time).count();
-                        inputs.push_back({last_key, static_cast<int>(duration)});
-                    }
-                    // Atualiza para a nova tecla
-                    last_key = key_name;
-                    last_input_time = now;
+            if (key_name != "UNKNOWN" && key_name != last_key) {
+                // Salva o tempo da tecla anterior, se houver
+                if (is_key_down && !last_key.empty()) {
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_time).count();
+                    inputs.push_back({last_key, static_cast<int>(duration)});
                 }
+
+                // Atualiza para a nova tecla
+                last_key = key_name;
+                last_input_time = now;
+                is_key_down = true;
+                any_key_pressed = true;
             }
         }
+    }
+
+    // Verifica se nenhuma tecla foi pressionada
+    if (!any_key_pressed && is_key_down) {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_time).count();
+        inputs.push_back({last_key, static_cast<int>(duration)});
+        last_key.clear();
+        is_key_down = false;
     }
 }
 
@@ -85,17 +97,19 @@ void render_gui() {
             inputs.clear();
             last_input_time = std::chrono::steady_clock::now();
             last_key.clear();
+            is_key_down = false;
             printf("Gravacao iniciada\n");
         }
     } else {
         if (ImGui::Button("Parar")) {
             is_recording = false;
-            if (!last_key.empty()) {
+            if (is_key_down && !last_key.empty()) {
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - last_input_time).count();
                 inputs.push_back({last_key, static_cast<int>(duration)});
             }
             saveInputsToFile();
             last_key.clear();
+            is_key_down = false;
             printf("Gravacao parada\n");
         }
     }
