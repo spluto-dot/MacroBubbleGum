@@ -21,9 +21,9 @@ void saveInputsToFile() {
     FILE* file = fopen("inputs.txt", "w");
     if (file) {
         for (const auto& input : inputs) {
-            fprintf(file, "holdKey("%s")\n", input.key.c_str());
+            fprintf(file, "holdKey(\"%s\")\n", input.key.c_str());
             fprintf(file, "sleep(%d)\n", input.frames);
-            fprintf(file, "releaseKey("%s")\n", input.key.c_str());
+            fprintf(file, "releaseKey(\"%s\")\n", input.key.c_str());
         }
         fclose(file);
         printf("Inputs salvos em inputs.txt\n");
