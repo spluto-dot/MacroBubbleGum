@@ -7,38 +7,52 @@
 #include <string>
 #include <GLFW/glfw3.h>
 #include <windows.h> // Para capturar teclas
+#include <chrono> // Para medir duracao
 
-// Estrutura para representar cada entrada de tecla e a duracao em frames
+// Estrutura para representar cada entrada de tecla e a duracao em ms
 struct InputEntry {
     std::string key;
-    int frames;
+    int duration_ms;
 };
 
 std::vector<InputEntry> inputs; // Vetor para armazenar as entradas de tecla
 bool is_recording = false;      // Flag para saber se está gravando
+std::chrono::steady_clock::time_point last_input_time; // Tempo do ultimo input
+std::string last_key; // Ultima tecla pressionada
 
 // Mapear as teclas para nomes legíveis
 std::string getKeyName(int vk_code) {
+    if ((vk_code >= 0x30 && vk_code <= 0x39) || (vk_code >= 0x41 && vk_code <= 0x5A)) {
+        return std::string(1, static_cast<char>(vk_code)); // Letras e numeros
+    }
     switch (vk_code) {
         case VK_UP: return "UP";
         case VK_DOWN: return "DOWN";
         case VK_LEFT: return "LEFT";
         case VK_RIGHT: return "RIGHT";
-        case 'A': return "A";
-        case 'B': return "B";
-        case 'X': return "X";
-        case 'Y': return "Y";
+        case VK_SPACE: return "SPACE";
+        case VK_RETURN: return "ENTER";
         default: return "UNKNOWN";
     }
 }
 
 // Capturar inputs do teclado
 void captureInputs() {
+    auto now = std::chrono::steady_clock::now();
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         if (GetAsyncKeyState(vk_code) & 0x8000) {
             std::string key_name = getKeyName(vk_code);
-            if (!key_name.empty() && (inputs.empty() || inputs.back().key != key_name)) {
-                inputs.push_back({key_name, 1}); // Adiciona a tecla pressionada com 1 frame
+            if (!key_name.empty()) {
+                if (key_name != last_key) {
+                    // Salva o tempo da tecla anterior
+                    if (!last_key.empty()) {
+                        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_input_time).count();
+                        inputs.push_back({last_key, static_cast<int>(duration)});
+                    }
+                    // Atualiza para a nova tecla
+                    last_key = key_name;
+                    last_input_time = now;
+                }
             }
         }
     }
@@ -50,7 +64,7 @@ void saveInputsToFile() {
     if (file) {
         for (const auto& input : inputs) {
             fprintf(file, "holdKey(\"%s\")\n", input.key.c_str());
-            fprintf(file, "sleep(%d)\n", input.frames);
+            fprintf(file, "sleep(%d)\n", input.duration_ms);
             fprintf(file, "releaseKey(\"%s\")\n", input.key.c_str());
         }
         fclose(file);
@@ -69,12 +83,19 @@ void render_gui() {
         if (ImGui::Button("Gravar")) {
             is_recording = true;
             inputs.clear();
+            last_input_time = std::chrono::steady_clock::now();
+            last_key.clear();
             printf("Gravacao iniciada\n");
         }
     } else {
         if (ImGui::Button("Parar")) {
             is_recording = false;
+            if (!last_key.empty()) {
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - last_input_time).count();
+                inputs.push_back({last_key, static_cast<int>(duration)});
+            }
             saveInputsToFile();
+            last_key.clear();
             printf("Gravacao parada\n");
         }
     }
