@@ -18,7 +18,7 @@ struct InputEntry {
 
 std::vector<InputEntry> inputs; // Vetor para armazenar as entradas de tecla
 bool is_recording = false;      // Flag para saber se está gravando
-std::unordered_map<std::string, std::chrono::steady_clock::time_point> active_keys; // Map para rastrear teclas pressionadas
+std::unordered_map<std::string, std::pair<std::chrono::steady_clock::time_point, bool>> active_keys; // Map para rastrear teclas pressionadas e seu status
 
 // Mapear as teclas para nomes legíveis
 std::string getKeyName(int vk_code) {
@@ -45,18 +45,18 @@ void captureInputs() {
         if (key_name != "UNKNOWN") {
             if (GetAsyncKeyState(vk_code) & 0x8000) {
                 // Tecla pressionada
-                if (active_keys.find(key_name) == active_keys.end()) {
+                if (active_keys.find(key_name) == active_keys.end() || !active_keys[key_name].second) {
                     printf("Tecla pressionada: %s\n", key_name.c_str()); // Log de depuração
-                    active_keys[key_name] = now; // Registrar o momento em que a tecla foi pressionada
+                    active_keys[key_name] = {now, true}; // Registrar o momento em que a tecla foi pressionada e marcar como ativa
                 }
             } else {
                 // Tecla liberada
-                if (active_keys.find(key_name) != active_keys.end()) {
-                    auto press_time = active_keys[key_name];
+                if (active_keys.find(key_name) != active_keys.end() && active_keys[key_name].second) {
+                    auto press_time = active_keys[key_name].first;
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
                     printf("Tecla liberada: %s, Duracao: %d ms\n", key_name.c_str(), static_cast<int>(duration)); // Log de depuração da duração
                     inputs.push_back({key_name, static_cast<int>(duration)});
-                    active_keys.erase(key_name); // Remover a tecla do mapa de teclas ativas
+                    active_keys[key_name].second = false; // Marcar a tecla como liberada
                 }
             }
         }
@@ -97,10 +97,13 @@ void render_gui() {
 
             // Finaliza qualquer tecla ainda ativa
             auto now = std::chrono::steady_clock::now();
-            for (const auto& [key, press_time] : active_keys) {
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
-                printf("Tecla liberada (finalizando): %s, Duracao: %d ms\n", key.c_str(), static_cast<int>(duration)); // Log de depuração na finalização
-                inputs.push_back({key, static_cast<int>(duration)});
+            for (const auto& [key, value] : active_keys) {
+                if (value.second) {
+                    auto press_time = value.first;
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
+                    printf("Tecla liberada (finalizando): %s, Duracao: %d ms\n", key.c_str(), static_cast<int>(duration)); // Log de depuração na finalização
+                    inputs.push_back({key, static_cast<int>(duration)});
+                }
             }
             active_keys.clear();
 
