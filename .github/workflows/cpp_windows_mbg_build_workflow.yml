@@ -26,8 +26,8 @@ jobs:
       run: |
         curl -L https://github.com/glfw/glfw/releases/download/3.3.4/glfw-3.3.4.bin.WIN64.zip --output glfw.zip
         tar -xf glfw.zip
-        if not exist glfw\include mkdir glfw\include
-        if not exist glfw\src mkdir glfw\src
+        if (!(Test-Path -Path glfw\include)) { New-Item -ItemType Directory -Path glfw\include }
+        if (!(Test-Path -Path glfw\src)) { New-Item -ItemType Directory -Path glfw\src }
         xcopy glfw-3.3.4.bin.WIN64\include glfw\include /E /I /Q
         xcopy glfw-3.3.4.bin.WIN64\lib-mingw-w64 glfw\src /E /I /Q
 
