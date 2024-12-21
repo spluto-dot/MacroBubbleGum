@@ -19,7 +19,8 @@ jobs:
     - name: Setup MinGW
       run: |
         choco install mingw -y
-        echo "::add-path::C:\\tools\\mingw64\\bin"
+      env:
+        PATH: ${{ secrets.PATH }};C:\tools\mingw64\bin
 
     - name: Install GLFW Dependencies
       run: |
