@@ -1,4 +1,4 @@
-name: C++ MBG Windows Build
+name: C++ Windows Build Workflow
 
 on:
   push:
@@ -13,28 +13,30 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-    - name: Setup C++ Compiler on Windows
-      run: choco install mingw
+    - name: Setup MinGW
+      uses: lukka/get-cmake@v3
+      with:
+        cmakeVersion: '3.20.2'
 
-    - name: Install Dependencies (GLFW and ImGui)
+    - name: Install GLFW Dependencies
       run: |
-        git clone https://github.com/glfw/glfw.git
-        git clone https://github.com/ocornut/imgui.git
-        cd glfw
-        cmake -G "MinGW Makefiles" .
-        mingw32-make
-        cd ..
+        curl -L https://github.com/glfw/glfw/releases/download/3.3.4/glfw-3.3.4.bin.WIN64.zip --output glfw.zip
+        tar -xf glfw.zip
+        mkdir -p glfw/include
+        mkdir -p glfw/src
+        xcopy glfw-3.3.4.bin.WIN64/include glfw/include /E /Q
+        xcopy glfw-3.3.4.bin.WIN64/lib-mingw-w64 glfw/src /E /Q
 
     - name: Compile Resource File and Application
       run: |
         windres mbg.rc -o mbg_res.o
-        g++ -Iglfw/include -Iimgui -Iimgui/backends mbg.cpp mbg_imgui_with_keys.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp mbg_res.o -o MacroBubbleGum.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static
+        g++ -Iglfw/include -Iimgui -Iimgui/backends mbg.cpp mbg_imgui_with_keys.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp imgui/imgui_widgets.cpp imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp mbg_res.o -o MacroBubbleGum.exe -Lglfw/src -lglfw3 -lgdi32 -lopengl32 -static -mwindows
 
-    - name: Upload artifact (Windows)
-      uses: actions/upload-artifact@v3
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
       with:
-        name: MacroBubbleGum_windows_build
-        path: ./MacroBubbleGum.exe
+        name: MacroBubbleGum
+        path: MacroBubbleGum.exe
