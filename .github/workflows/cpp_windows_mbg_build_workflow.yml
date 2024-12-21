@@ -19,17 +19,16 @@ jobs:
     - name: Download and Setup MinGW
       run: |
         curl -L https://sourceforge.net/projects/mingw-w64/files/latest/download -o mingw.zip
-        tar -xf mingw.zip --directory C:\mingw64 --strip-components=1
-        echo "C:\mingw64\bin" >> $GITHUB_ENV
+        tar -xf mingw.zip --directory C:/mingw64 --strip-components=1
+        echo "C:/mingw64/bin" >> $GITHUB_ENV
 
     - name: Install GLFW Dependencies
       run: |
         curl -L https://github.com/glfw/glfw/releases/download/3.3.4/glfw-3.3.4.bin.WIN64.zip --output glfw.zip
         tar -xf glfw.zip
-        mkdir -p glfw/include
-        mkdir -p glfw/src
-        xcopy glfw-3.3.4.bin.WIN64/include glfw/include /E /Q
-        xcopy glfw-3.3.4.bin.WIN64/lib-mingw-w64 glfw/src /E /Q
+        mkdir -p glfw/include glfw/src
+        cp -r glfw-3.3.4.bin.WIN64/include/* glfw/include/
+        cp -r glfw-3.3.4.bin.WIN64/lib-mingw-w64/* glfw/src/
 
     - name: Compile Resource File and Application
       run: |
