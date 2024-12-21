@@ -123,6 +123,12 @@ void render_gui() {
 
     ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
 
+    if (is_recording) {
+        auto now = std::chrono::steady_clock::now();
+        int elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - recording_start).count();
+        ImGui::Text("Tempo gravando: %d ms", elapsed_time);
+    }
+
     // Botão para limpar o console
     if (ImGui::Button("Limpar Console")) {
         console_logs.clear();
