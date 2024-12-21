@@ -16,11 +16,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Setup MinGW
+    - name: Download and Setup MinGW
       run: |
-        choco install mingw -y
-      env:
-        PATH: ${{ secrets.PATH }};C:\tools\mingw64\bin
+        curl -L https://sourceforge.net/projects/mingw-w64/files/latest/download -o mingw.zip
+        tar -xf mingw.zip --directory C:\mingw64 --strip-components=1
+        echo "C:\mingw64\bin" >> $GITHUB_ENV
 
     - name: Install GLFW Dependencies
       run: |
