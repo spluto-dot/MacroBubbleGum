@@ -9,18 +9,19 @@
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
 // Estrutura para armazenar os logs do console
 std::vector<std::string> console_logs;
 
 // Estrutura para capturar entradas
-struct KeyInput {
+struct KeyEvent {
     std::string key;
-    int duration;
+    int timestamp;
+    bool is_press;
 };
 
-std::vector<KeyInput> inputs;
-std::unordered_map<std::string, std::chrono::steady_clock::time_point> active_keys;
+std::vector<KeyEvent> events;
 bool is_recording = false;
 std::chrono::steady_clock::time_point recording_start;
 
@@ -43,10 +44,18 @@ void SaveInputsToFile() {
     std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
 
     std::ofstream file(filename);
-    for (const auto& input : inputs) {
-        file << "holdKey(\"" << input.key << "\")\n";
-        file << "sleep(" << input.duration << ")\n";
-        file << "releaseKey(\"" << input.key << "\")\n";
+    int last_timestamp = 0;
+    for (const auto& event : events) {
+        int sleep_time = event.timestamp - last_timestamp;
+        if (sleep_time > 0) {
+            file << "sleep(" << sleep_time << ")\n";
+        }
+        if (event.is_press) {
+            file << "holdKey(\"" << event.key << "\")\n";
+        } else {
+            file << "releaseKey(\"" << event.key << "\")\n";
+        }
+        last_timestamp = event.timestamp;
     }
     file.close();
     LogToConsole("Inputs salvos em " + std::string(filename));
@@ -71,27 +80,64 @@ std::string GetKeyName(int vk_code) {
 // Capturar inputs do teclado
 void CaptureInputs() {
     auto now = std::chrono::steady_clock::now();
+    int current_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - recording_start).count();
 
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         std::string key_name = GetKeyName(vk_code);
         if (key_name != "UNKNOWN") {
-            if (GetAsyncKeyState(vk_code) & 0x8000) {
+            static std::unordered_map<std::string, bool> key_states;
+
+            bool is_pressed = (GetAsyncKeyState(vk_code) & 0x8000) != 0;
+            if (is_pressed && !key_states[key_name]) {
                 // Tecla pressionada
-                if (active_keys.find(key_name) == active_keys.end()) {
-                    active_keys[key_name] = now; // Registrar o momento em que a tecla foi pressionada
-                    LogToConsole("Tecla pressionada: " + key_name);
-                }
-            } else {
+                key_states[key_name] = true;
+                events.push_back({key_name, current_time, true});
+                LogToConsole("Tecla pressionada: " + key_name);
+            } else if (!is_pressed && key_states[key_name]) {
                 // Tecla liberada
-                if (active_keys.find(key_name) != active_keys.end()) {
-                    auto press_time = active_keys[key_name];
-                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
-                    inputs.push_back({key_name, static_cast<int>(duration)});
-                    active_keys.erase(key_name); // Remover a tecla do mapa de teclas ativas
-                    LogToConsole("Tecla liberada: " + key_name + ", Duracao: " + std::to_string(duration) + " ms");
-                }
+                key_states[key_name] = false;
+                events.push_back({key_name, current_time, false});
+                LogToConsole("Tecla liberada: " + key_name);
             }
         }
+    }
+}
+
+// Renderiza a interface gráfica
+void render_gui() {
+    ImGui::Begin("MacroBubbleGum");
+    ImGui::Text("=== Aviso ===");
+    ImGui::Text("Shift, Ctrl e teclas de funcao (F1~F12) nao sao suportados.");
+
+    if (ImGui::Button(is_recording ? "Parar" : "Gravar")) {
+        is_recording = !is_recording;
+        if (is_recording) {
+            recording_start = std::chrono::steady_clock::now();
+            events.clear();
+            LogToConsole("Gravacao iniciada");
+        } else {
+            SaveInputsToFile();
+            LogToConsole("Gravacao parada");
+        }
+    }
+
+    ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
+
+    // Botão para limpar o console
+    if (ImGui::Button("Limpar Console")) {
+        console_logs.clear();
+    }
+
+    ImGui::Text("Console:");
+    ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+    for (const auto& log : console_logs) {
+        ImGui::TextUnformatted(log.c_str());
+    }
+    ImGui::EndChild();
+    ImGui::End();
+
+    if (is_recording) {
+        CaptureInputs();
     }
 }
 
@@ -123,40 +169,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("MacroBubbleGum");
-        ImGui::Text("=== Aviso ===");
-        ImGui::Text("Shift, Ctrl e teclas de funcao (F1~F12) nao sao suportados.");
-
-        if (ImGui::Button(is_recording ? "Parar" : "Gravar")) {
-            is_recording = !is_recording;
-            if (is_recording) {
-                recording_start = std::chrono::steady_clock::now();
-                inputs.clear();
-                LogToConsole("Gravacao iniciada");
-            } else {
-                SaveInputsToFile();
-                LogToConsole("Gravacao parada");
-            }
-        }
-
-        ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
-
-        // Botão para limpar o console
-        if (ImGui::Button("Limpar Console")) {
-            console_logs.clear();
-        }
-
-        ImGui::Text("Console:");
-        ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
-        for (const auto& log : console_logs) {
-            ImGui::TextUnformatted(log.c_str());
-        }
-        ImGui::EndChild();
-        ImGui::End();
-
-        if (is_recording) {
-            CaptureInputs();
-        }
+        render_gui();
 
         ImGui::Render();
         int display_w, display_h;
