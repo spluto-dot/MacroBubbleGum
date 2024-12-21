@@ -114,6 +114,11 @@ void saveInputsToFile() {
 void render_gui() {
     ImGui::Begin("MacroBubbleGum");
 
+    // Mensagem separada na interface
+    ImGui::Text("=== Aviso ===");
+    ImGui::Text("Shift e Ctrl nao sao suportados.");
+    ImGui::Separator();
+
     // Botao de gravacao
     if (!is_recording) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); // Botao vermelho
@@ -174,9 +179,4 @@ void render_gui() {
     if (is_recording) {
         captureInputs();
     }
-
-    // Janela separada para mensagem de aviso
-    ImGui::Begin("Aviso");
-    ImGui::Text("Shift e Ctrl nao sao suportados.");
-    ImGui::End();
 }
