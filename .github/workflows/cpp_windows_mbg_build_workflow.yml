@@ -26,9 +26,10 @@ jobs:
       run: |
         curl -L https://github.com/glfw/glfw/releases/download/3.3.4/glfw-3.3.4.bin.WIN64.zip --output glfw.zip
         tar -xf glfw.zip
-        mkdir -p glfw/include glfw/src
-        cp -r glfw-3.3.4.bin.WIN64/include/* glfw/include/
-        cp -r glfw-3.3.4.bin.WIN64/lib-mingw-w64/* glfw/src/
+        if not exist glfw\include mkdir glfw\include
+        if not exist glfw\src mkdir glfw\src
+        xcopy glfw-3.3.4.bin.WIN64\include glfw\include /E /I /Q
+        xcopy glfw-3.3.4.bin.WIN64\lib-mingw-w64 glfw\src /E /I /Q
 
     - name: Compile Resource File and Application
       run: |
