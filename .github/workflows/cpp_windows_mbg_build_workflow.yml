@@ -22,6 +22,12 @@ jobs:
         tar -xf mingw.zip --directory C:/mingw64 --strip-components=1
         echo "C:/mingw64/bin" >> $GITHUB_ENV
 
+    - name: Download ImGui
+      run: |
+        curl -L https://github.com/ocornut/imgui/archive/refs/heads/master.zip --output imgui.zip
+        tar -xf imgui.zip
+        mv imgui-master imgui
+
     - name: Install GLFW Dependencies
       run: |
         curl -L https://github.com/glfw/glfw/releases/download/3.3.4/glfw-3.3.4.bin.WIN64.zip --output glfw.zip
