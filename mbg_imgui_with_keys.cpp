@@ -1,41 +1,60 @@
-#include "globals.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include <stdio.h>
+#include <GLFW/glfw3.h>
 #include <vector>
 #include <string>
+#include <chrono>
 #include <unordered_map>
-#include <GLFW/glfw3.h>
-#include <windows.h> // Para capturar teclas
-#include <chrono> // Para medir duracao
-#include <ctime>  // Para formatar data e hora
+#include <fstream>
+#include <iostream>
 
-// Estrutura para representar cada entrada de tecla e o evento
-struct InputEvent {
+// Estrutura para armazenar os logs do console
+std::vector<std::string> console_logs;
+
+// Estrutura para capturar entradas
+struct KeyInput {
     std::string key;
-    std::string action; // "hold" ou "release"
-    int timestamp_ms;
+    int duration;
 };
 
-std::vector<InputEvent> inputs; // Vetor para armazenar os eventos de entrada
-bool is_recording = false;      // Flag para saber se está gravando
-std::unordered_map<std::string, bool> active_keys; // Map para rastrear teclas pressionadas
-std::chrono::steady_clock::time_point start_time; // Tempo inicial da gravação
-std::vector<std::string> log_messages; // Mensagens para o console integrado
+std::vector<KeyInput> inputs;
+std::unordered_map<std::string, std::chrono::steady_clock::time_point> active_keys;
+bool is_recording = false;
+std::chrono::steady_clock::time_point recording_start;
 
-// Adiciona mensagens ao console interno
-void addLogMessage(const std::string& message) {
-    log_messages.push_back(message);
-    if (log_messages.size() > 100) {
-        log_messages.erase(log_messages.begin()); // Limitar o tamanho do log
+// Função para registrar logs no console
+void LogToConsole(const std::string& message) {
+    console_logs.push_back(message);
+}
+
+// Função para salvar entradas no arquivo
+void SaveInputsToFile() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm;
+#ifdef _WIN32
+    localtime_s(&now_tm, &now_time);
+#else
+    localtime_r(&now_time, &now_tm);
+#endif
+    char filename[32];
+    std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
+
+    std::ofstream file(filename);
+    for (const auto& input : inputs) {
+        file << "holdKey(\"" << input.key << "\")\n";
+        file << "sleep(" << input.duration << ")\n";
+        file << "releaseKey(\"" << input.key << "\")\n";
     }
+    file.close();
+    LogToConsole("Inputs salvos em " + std::string(filename));
 }
 
 // Mapear as teclas para nomes legíveis
-std::string getKeyName(int vk_code) {
+std::string GetKeyName(int vk_code) {
     if ((vk_code >= 0x30 && vk_code <= 0x39) || (vk_code >= 0x41 && vk_code <= 0x5A)) {
-        return std::string(1, static_cast<char>(vk_code)); // Letras e numeros
+        return std::string(1, static_cast<char>(vk_code)); // Letras e números
     }
     switch (vk_code) {
         case VK_UP: return "UP";
@@ -49,134 +68,111 @@ std::string getKeyName(int vk_code) {
 }
 
 // Capturar inputs do teclado
-void captureInputs() {
+void CaptureInputs() {
     auto now = std::chrono::steady_clock::now();
-    int elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
 
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
-        std::string key_name = getKeyName(vk_code);
-        if (key_name != "UNKNOWN" && vk_code != VK_SHIFT && vk_code != VK_CONTROL) {
+        std::string key_name = GetKeyName(vk_code);
+        if (key_name != "UNKNOWN") {
             if (GetAsyncKeyState(vk_code) & 0x8000) {
                 // Tecla pressionada
-                if (active_keys.find(key_name) == active_keys.end() || !active_keys[key_name]) {
-                    addLogMessage("Tecla pressionada: " + key_name);
-                    inputs.push_back({key_name, "hold", elapsed_time});
-                    active_keys[key_name] = true; // Marcar a tecla como ativa
+                if (active_keys.find(key_name) == active_keys.end()) {
+                    active_keys[key_name] = now; // Registrar o momento em que a tecla foi pressionada
+                    LogToConsole("Tecla pressionada: " + key_name);
                 }
             } else {
                 // Tecla liberada
-                if (active_keys.find(key_name) != active_keys.end() && active_keys[key_name]) {
-                    addLogMessage("Tecla liberada: " + key_name);
-                    inputs.push_back({key_name, "release", elapsed_time});
-                    active_keys[key_name] = false; // Marcar a tecla como liberada
+                if (active_keys.find(key_name) != active_keys.end()) {
+                    auto press_time = active_keys[key_name];
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - press_time).count();
+                    inputs.push_back({key_name, static_cast<int>(duration)});
+                    active_keys.erase(key_name); // Remover a tecla do mapa de teclas ativas
+                    LogToConsole("Tecla liberada: " + key_name + ", Duracao: " + std::to_string(duration) + " ms");
                 }
             }
         }
     }
 }
 
-// Gera o nome do arquivo baseado na data e hora
-std::string generateFileName() {
-    auto now = std::time(nullptr);
-    char buffer[20];
-    std::strftime(buffer, sizeof(buffer), "%d%m%Y%H%M.txt", std::localtime(&now));
-    return std::string(buffer);
-}
+int main() {
+    // Inicialização do GLFW
+    if (!glfwInit())
+        return -1;
 
-// Funcao para salvar os inputs em um arquivo
-void saveInputsToFile() {
-    std::string filename = generateFileName();
-    FILE* file = fopen(filename.c_str(), "w");
-    if (file) {
-        int last_timestamp = 0;
-        for (const auto& input : inputs) {
-            int sleep_time = input.timestamp_ms - last_timestamp;
-            if (sleep_time > 0) {
-                fprintf(file, "sleep(%d)\n", sleep_time);
+    GLFWwindow* window = glfwCreateWindow(800, 600, "MacroBubbleGum", NULL, NULL);
+    if (!window) {
+        glfwTerminate();
+        return -1;
+    }
+
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 130");
+
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("MacroBubbleGum");
+        ImGui::Text("=== Aviso ===");
+        ImGui::Text("Shift, Ctrl e teclas de funcao (F1~F12) nao sao suportados.");
+
+        if (ImGui::Button(is_recording ? "Parar" : "Gravar")) {
+            is_recording = !is_recording;
+            if (is_recording) {
+                recording_start = std::chrono::steady_clock::now();
+                inputs.clear();
+                LogToConsole("Gravacao iniciada");
+            } else {
+                SaveInputsToFile();
+                LogToConsole("Gravacao parada");
             }
-
-            if (input.action == "hold") {
-                fprintf(file, "holdKey(\"%s\")\n", input.key.c_str());
-            } else if (input.action == "release") {
-                fprintf(file, "releaseKey(\"%s\")\n", input.key.c_str());
-            }
-
-            last_timestamp = input.timestamp_ms;
         }
-        fclose(file);
-        addLogMessage("Inputs salvos em " + filename);
-    } else {
-        addLogMessage("Erro ao salvar inputs!");
-    }
-}
 
-// Funcao que renderiza a interface grafica
-void render_gui() {
-    ImGui::Begin("MacroBubbleGum");
+        ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
 
-    // Mensagem separada na interface
-    ImGui::Text("=== Aviso ===");
-    ImGui::Text("Shift e Ctrl nao sao suportados.");
-    ImGui::Separator();
-
-    // Botao de gravacao
-    if (!is_recording) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); // Botao vermelho
-        if (ImGui::Button("Gravar")) {
-            is_recording = true;
-            inputs.clear();
-            active_keys.clear();
-            start_time = std::chrono::steady_clock::now(); // Iniciar o contador
-            addLogMessage("Gravacao iniciada");
+        // Botão para limpar o console
+        if (ImGui::Button("Limpar Console")) {
+            console_logs.clear();
         }
-        ImGui::PopStyleColor();
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.5f, 0.5f, 1.0f)); // Botao cinza
-        if (ImGui::Button("Parar")) {
-            is_recording = false;
 
-            // Finaliza qualquer tecla ainda ativa
-            auto now = std::chrono::steady_clock::now();
-            int elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-            for (const auto& [key, is_active] : active_keys) {
-                if (is_active) {
-                    addLogMessage("Tecla liberada (finalizando): " + key);
-                    inputs.push_back({key, "release", elapsed_time});
-                }
-            }
-            active_keys.clear();
-
-            saveInputsToFile();
-            addLogMessage("Gravacao parada");
+        ImGui::Text("Console:");
+        ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+        for (const auto& log : console_logs) {
+            ImGui::TextUnformatted(log.c_str());
         }
-        ImGui::PopStyleColor();
+        ImGui::EndChild();
+        ImGui::End();
+
+        if (is_recording) {
+            CaptureInputs();
+        }
+
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        glClearColor(0.45f, 0.55f, 0.60f, 1.00f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(window);
     }
 
-    ImGui::Separator();
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
-    // Exibe o status atual e o tempo decorrido
-    if (is_recording) {
-        auto now = std::chrono::steady_clock::now();
-        int elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
-        ImGui::Text("Status: Gravando (%d ms)", elapsed_time);
-    } else {
-        ImGui::Text("Status: Parado");
-    }
-
-    ImGui::Separator();
-
-    // Exibir log interno
-    ImGui::Text("Console:");
-    ImGui::BeginChild("Log", ImVec2(0, 150), true);
-    for (const auto& message : log_messages) {
-        ImGui::TextWrapped("%s", message.c_str());
-    }
-    ImGui::EndChild();
-
-    ImGui::End();
-
-    // Captura inputs enquanto grava
-    if (is_recording) {
-        captureInputs();
-    }
+    return 0;
 }
