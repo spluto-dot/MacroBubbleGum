@@ -73,6 +73,18 @@ std::string GetKeyName(int vk_code) {
         case VK_RIGHT: return "RIGHT";
         case VK_SPACE: return "SPACE";
         case VK_RETURN: return "ENTER";
+        case VK_F1: return "F1";
+        case VK_F2: return "F2";
+        case VK_F3: return "F3";
+        case VK_F4: return "F4";
+        case VK_F5: return "F5";
+        case VK_F6: return "F6";
+        case VK_F7: return "F7";
+        case VK_F8: return "F8";
+        case VK_F9: return "F9";
+        case VK_F10: return "F10";
+        case VK_F11: return "F11";
+        case VK_F12: return "F12";
         default: return "UNKNOWN";
     }
 }
@@ -107,7 +119,7 @@ void CaptureInputs() {
 void render_gui() {
     ImGui::Begin("MacroBubbleGum");
     ImGui::Text("=== Aviso ===");
-    ImGui::Text("Shift, Ctrl e teclas de funcao (F1~F12) nao sao suportados.");
+    ImGui::Text("As teclas Shift e Ctrl não são suportadas.");
 
     if (ImGui::Button(is_recording ? "Parar" : "Gravar")) {
         is_recording = !is_recording;
@@ -136,6 +148,7 @@ void render_gui() {
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
     }
