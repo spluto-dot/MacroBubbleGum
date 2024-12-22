@@ -148,16 +148,22 @@ void render_gui() {
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
-    static size_t last_log_count = 0; // Armazena o número de logs anteriores
     
-    if (console_logs.size() != last_log_count) {
-        ImGui::SetScrollHereY(1.0f); // Só rola para o final quando novos logs forem adicionados
-        last_log_count = console_logs.size();
-    }
+    // Verificar se o usuário está interagindo com o scroll
+    float scroll_y = ImGui::GetScrollY();
+    float scroll_max_y = ImGui::GetScrollMaxY();
+    bool should_auto_scroll = (scroll_y >= scroll_max_y - 1.0f);
     
+    // Adicionar os logs
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
     }
+    
+    // Apenas rolar automaticamente se o scroll estiver no final
+    if (should_auto_scroll) {
+        ImGui::SetScrollHereY(1.0f);
+    }
+    
     ImGui::EndChild();
     ImGui::End();
 
