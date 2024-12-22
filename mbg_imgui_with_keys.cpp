@@ -148,16 +148,16 @@ void render_gui() {
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+    static size_t last_log_count = 0; // Armazena o número de logs anteriores
     
-    // Configurar rolagem automática
-    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-        ImGui::SetScrollHereY(1.0f); // Move para o final
+    if (console_logs.size() != last_log_count) {
+        ImGui::SetScrollHereY(1.0f); // Só rola para o final quando novos logs forem adicionados
+        last_log_count = console_logs.size();
     }
     
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
     }
-    
     ImGui::EndChild();
     ImGui::End();
 
