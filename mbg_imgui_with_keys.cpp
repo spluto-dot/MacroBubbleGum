@@ -21,11 +21,17 @@ struct KeyEvent {
     bool is_press;
 };
 
+// Sobrecarga do operador << para KeyEvent
+std::ostream& operator<<(std::ostream& os, const KeyEvent& event) {
+    os << (event.is_press ? "holdKey" : "releaseKey") << "(\"" << event.key << "\")";
+    os << " // Timestamp: " << event.timestamp << " microseconds";
+    return os;
+}
+
 std::vector<KeyEvent> events;
 bool is_recording = false;
-bool capture_mouse = false;
-int frame_duration = 16670; // Default para 60fps
 std::chrono::steady_clock::time_point recording_start;
+int frame_duration = 16670; // Default para 60fps
 
 // Função para registrar logs no console
 void LogToConsole(const std::string& message) {
@@ -34,25 +40,35 @@ void LogToConsole(const std::string& message) {
 
 // Função para salvar entradas no arquivo
 void SaveInputsToFile() {
-    std::ofstream file("inputs.txt");
+    // Obter a data e hora atuais
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm;
+#ifdef _WIN32
+    localtime_s(&now_tm, &now_time);
+#else
+    localtime_r(&now_time, &now_tm);
+#endif
+    char filename[32];
+    std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
 
+    // Abrir arquivo com o nome formatado
+    std::ofstream file(filename);
+
+    // Variável para calcular o tempo total acumulado
     int total_elapsed_us = 0;
+
     for (const auto& event : events) {
         while (total_elapsed_us + frame_duration <= event.timestamp) {
             file << "sleep_us(" << frame_duration << ")\n";
             total_elapsed_us += frame_duration;
         }
-
-        if (event.is_press) {
-            file << "holdKey(\"" << event.key << "\")\n";
-        } else {
-            file << "releaseKey(\"" << event.key << "\")\n";
-        }
+        file << event << "\n";
         total_elapsed_us = event.timestamp;
     }
 
     file.close();
-    LogToConsole("Inputs salvos em inputs.txt");
+    LogToConsole("Inputs salvos em: " + std::string(filename));
 }
 
 // Mapear as teclas para nomes legíveis
@@ -83,10 +99,12 @@ void CaptureInputs() {
 
             bool is_pressed = (GetAsyncKeyState(vk_code) & 0x8000) != 0;
             if (is_pressed && !key_states[key_name]) {
+                // Tecla pressionada
                 key_states[key_name] = true;
                 events.push_back({key_name, current_time, true});
                 LogToConsole("Tecla pressionada: " + key_name);
             } else if (!is_pressed && key_states[key_name]) {
+                // Tecla liberada
                 key_states[key_name] = false;
                 events.push_back({key_name, current_time, false});
                 LogToConsole("Tecla liberada: " + key_name);
@@ -99,7 +117,7 @@ void CaptureInputs() {
 void render_gui() {
     ImGui::Begin("MacroBubbleGum");
     ImGui::Text("=== Aviso ===");
-    ImGui::Text("Shift e Ctrl nao sao suportados.");
+    ImGui::Text("Shift e Ctrl nao sao suportadas.");
 
     if (ImGui::Button(is_recording ? "Parar" : "Gravar")) {
         is_recording = !is_recording;
@@ -115,30 +133,15 @@ void render_gui() {
 
     ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
 
-    // Botão para capturar mouse
-    ImGui::Checkbox("Capturar Mouse", &capture_mouse);
-
-    // Botões para alterar a duração dos frames
-    if (ImGui::Button("60fps (16670us)")) frame_duration = 16670;
-    ImGui::SameLine();
-    if (ImGui::Button("59.94fps (16683us)")) frame_duration = 16683;
-    ImGui::SameLine();
-    if (ImGui::Button("57.52416fps (17380us)")) frame_duration = 17380;
-    ImGui::SameLine();
-    if (ImGui::Button("30fps (33333us)")) frame_duration = 33333;
-
-    // Botão para limpar o console
     if (ImGui::Button("Limpar Console")) {
         console_logs.clear();
     }
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
-    }
-    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-        ImGui::SetScrollHereY(1.0f); // Ajusta o scroll para acompanhar os logs
     }
     ImGui::EndChild();
     ImGui::End();
