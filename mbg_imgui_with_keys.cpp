@@ -169,19 +169,9 @@ void render_gui() {
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
-    if (console_logs.size() > 0) {
-        static bool auto_scroll = true; // Variável para controlar o auto-scroll
-        if (ImGui::Checkbox("Auto Scroll", &auto_scroll)) {
-            if (auto_scroll) {
-                ImGui::SetScrollHereY(1.0f); // Ative o auto-scroll ao final
-            }
-        }
-        for (const auto& log : console_logs) {
-            ImGui::TextUnformatted(log.c_str());
-        }
-        if (auto_scroll) {
-            ImGui::SetScrollHereY(1.0f); // Role para o final automaticamente
-        }
+    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
+    for (const auto& log : console_logs) {
+        ImGui::TextUnformatted(log.c_str());
     }
     ImGui::EndChild();
     ImGui::End();
