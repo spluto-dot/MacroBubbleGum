@@ -34,29 +34,25 @@ void LogToConsole(const std::string& message) {
 
 // Função para salvar entradas no arquivo
 void SaveInputsToFile() {
-    // Obter a data e hora atuais
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-    std::tm now_tm;
-#ifdef _WIN32
-    localtime_s(&now_tm, &now_time);
-#else
-    localtime_r(&now_time, &now_tm);
-#endif
-    char filename[32];
-    std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
+    std::ofstream file("inputs.txt");
 
-    // Abrir arquivo com o nome formatado
-    std::ofstream file(filename);
-
-    // Gravar inputs no arquivo
+    int total_elapsed_us = 0;
     for (const auto& event : events) {
-        file << event << "\n"; // Aqui ajustamos para `events`, substituindo `inputs`
+        while (total_elapsed_us + frame_duration <= event.timestamp) {
+            file << "sleep_us(" << frame_duration << ")\n";
+            total_elapsed_us += frame_duration;
+        }
+
+        if (event.is_press) {
+            file << "holdKey(\"" << event.key << "\")\n";
+        } else {
+            file << "releaseKey(\"" << event.key << "\")\n";
+        }
+        total_elapsed_us = event.timestamp;
     }
 
     file.close();
-
-    LogToConsole("Inputs salvos em: " + std::string(filename));
+    LogToConsole("Inputs salvos em inputs.txt");
 }
 
 // Mapear as teclas para nomes legíveis
