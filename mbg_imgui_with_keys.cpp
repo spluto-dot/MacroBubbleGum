@@ -50,8 +50,8 @@ void SaveInputsToFile() {
     std::ofstream file(filename);
 
     // Gravar inputs no arquivo
-    for (const auto& line : inputs) {
-        file << line << "\n";
+    for (const auto& event : events) {
+        file << event << "\n"; // Aqui ajustamos para `events`, substituindo `inputs`
     }
 
     file.close();
