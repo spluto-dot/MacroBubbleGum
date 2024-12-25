@@ -9,9 +9,8 @@
 #include <unordered_map>
 #include <fstream>
 #include <iostream>
-#include <algorithm>
 
-// Estrutura para armazenar os logs do console
+// Estrutura para armazenar logs do console
 std::vector<std::string> console_logs;
 
 // Estrutura para capturar entradas
@@ -24,12 +23,14 @@ struct KeyEvent {
 std::vector<KeyEvent> events;
 bool is_recording = false;
 bool capture_mouse = false;
+int frame_interval_us = 16670; // Intervalo inicial para 60fps
 std::chrono::steady_clock::time_point recording_start;
+std::chrono::steady_clock::time_point last_frame_time;
 
 // Função para registrar logs no console
 void LogToConsole(const std::string& message) {
     console_logs.push_back(message);
-    if (console_logs.size() > 100) {
+    if (console_logs.size() > 1000) { // Limitar tamanho do console
         console_logs.erase(console_logs.begin());
     }
 }
@@ -48,18 +49,9 @@ void SaveInputsToFile() {
     std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
 
     std::ofstream file(filename);
-    int last_timestamp = 0;
     for (const auto& event : events) {
-        int sleep_time = event.timestamp - last_timestamp;
-        if (sleep_time > 0) {
-            file << "sleep_us(" << sleep_time << ")\n";
-        }
-        if (event.is_press) {
-            file << "holdKey(\"" << event.key << "\")\n";
-        } else {
-            file << "releaseKey(\"" << event.key << "\")\n";
-        }
-        last_timestamp = event.timestamp;
+        file << (event.is_press ? "holdKey(\"" : "releaseKey(\"") << event.key << "\")\n";
+        file << "sleep_us(" << frame_interval_us << ")\n";
     }
     file.close();
     LogToConsole("Inputs salvos em " + std::string(filename));
@@ -68,7 +60,7 @@ void SaveInputsToFile() {
 // Mapear as teclas para nomes legíveis
 std::string GetKeyName(int vk_code) {
     if ((vk_code >= 0x30 && vk_code <= 0x39) || (vk_code >= 0x41 && vk_code <= 0x5A)) {
-        return std::string(1, static_cast<char>(vk_code)); // Letras e números
+        return std::string(1, static_cast<char>(vk_code));
     }
     switch (vk_code) {
         case VK_UP: return "UP";
@@ -81,41 +73,37 @@ std::string GetKeyName(int vk_code) {
     }
 }
 
-// Capturar inputs do teclado e mouse
+// Capturar inputs do teclado
 void CaptureInputs() {
     auto now = std::chrono::steady_clock::now();
     int current_time = std::chrono::duration_cast<std::chrono::microseconds>(now - recording_start).count();
 
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         std::string key_name = GetKeyName(vk_code);
-        if (key_name != "UNKNOWN" && key_name != "sleep_us") {
+        if (key_name != "UNKNOWN") {
             static std::unordered_map<std::string, bool> key_states;
 
             bool is_pressed = (GetAsyncKeyState(vk_code) & 0x8000) != 0;
             if (is_pressed && !key_states[key_name]) {
-                // Tecla pressionada
                 key_states[key_name] = true;
                 events.push_back({key_name, current_time, true});
                 LogToConsole("Tecla pressionada: " + key_name);
             } else if (!is_pressed && key_states[key_name]) {
-                // Tecla liberada
                 key_states[key_name] = false;
                 events.push_back({key_name, current_time, false});
                 LogToConsole("Tecla liberada: " + key_name);
             }
         }
     }
+}
 
-    if (capture_mouse) {
-        POINT p;
-        if (GetCursorPos(&p)) {
-            static POINT last_position = {0, 0};
-            if (p.x != last_position.x || p.y != last_position.y) {
-                events.push_back({"MOUSE_MOVE", current_time, true});
-                LogToConsole("Mouse move: (" + std::to_string(p.x) + ", " + std::to_string(p.y) + ")");
-                last_position = p;
-            }
-        }
+// Capturar posição do mouse
+void CaptureMouse() {
+    POINT p;
+    if (GetCursorPos(&p)) {
+        auto now = std::chrono::steady_clock::now();
+        int current_time = std::chrono::duration_cast<std::chrono::microseconds>(now - recording_start).count();
+        events.push_back({"MOUSE_X:" + std::to_string(p.x) + "_Y:" + std::to_string(p.y), current_time, true});
     }
 }
 
@@ -129,6 +117,7 @@ void render_gui() {
         is_recording = !is_recording;
         if (is_recording) {
             recording_start = std::chrono::steady_clock::now();
+            last_frame_time = recording_start;
             events.clear();
             LogToConsole("Gravacao iniciada");
         } else {
@@ -139,35 +128,37 @@ void render_gui() {
 
     ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
 
-    if (is_recording) {
-        auto now = std::chrono::steady_clock::now();
-        int elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - recording_start).count();
-        ImGui::Text("Tempo gravando: %d ms", elapsed_time);
+    if (ImGui::Checkbox("Capturar Mouse", &capture_mouse)) {
+        LogToConsole(capture_mouse ? "Captura de mouse ativada" : "Captura de mouse desativada");
     }
 
-    ImGui::Checkbox("Capturar Mouse", &capture_mouse);
-
-    // Botão para limpar o console
     if (ImGui::Button("Limpar Console")) {
         console_logs.clear();
     }
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
     }
-    ImGui::SetScrollHereY(1.0f);
     ImGui::EndChild();
     ImGui::End();
 
     if (is_recording) {
-        CaptureInputs();
+        auto now = std::chrono::steady_clock::now();
+        int elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(now - last_frame_time).count();
+        if (elapsed_time >= frame_interval_us) {
+            last_frame_time = now;
+            CaptureInputs();
+            if (capture_mouse) {
+                CaptureMouse();
+            }
+        }
     }
 }
 
 int main() {
-    // Inicialização do GLFW
     if (!glfwInit())
         return -1;
 
