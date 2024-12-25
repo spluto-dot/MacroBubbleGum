@@ -14,60 +14,61 @@
 // Estrutura para armazenar os logs do console
 std::vector<std::string> console_logs;
 
-// Estrutura para capturar eventos
-struct Event {
-    std::string type; // "KEYBOARD" ou "MOUSE"
-    std::string key; // Nome da tecla, se aplicável
-    bool is_press;   // true para pressionar, false para soltar (apenas teclado)
-    std::string action; // "MOVE", "LEFT_CLICK", "RIGHT_CLICK" (apenas mouse)
-    int x, y;       // Posição do mouse, se aplicável
-    int timestamp;  // Timestamp em microsegundos
+// Estrutura para capturar entradas
+struct KeyEvent {
+    std::string key;
+    int timestamp;
+    bool is_press;
 };
 
-std::vector<Event> events;
+struct MouseEvent {
+    int x, y;
+    int timestamp;
+};
+
+std::vector<KeyEvent> events;
+std::vector<MouseEvent> mouse_events;
 bool is_recording = false;
 bool capture_mouse = false;
 std::chrono::steady_clock::time_point recording_start;
+int sleep_duration_us = 16670; // Padrão 60fps
 
 // Função para registrar logs no console
 void LogToConsole(const std::string& message) {
     console_logs.push_back(message);
 }
 
-// Função para salvar entradas e mouse no arquivo
-void SaveInputsAndMouseToFile() {
-    std::ofstream file("inputs_mouse.txt");
-    int last_timestamp = 0;
+// Função para salvar entradas no arquivo
+void SaveInputsToFile() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm now_tm;
+#ifdef _WIN32
+    localtime_s(&now_tm, &now_time);
+#else
+    localtime_r(&now_time, &now_tm);
+#endif
+    char filename[32];
+    std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
 
-    std::sort(events.begin(), events.end(), [](const Event& a, const Event& b) {
-        return a.timestamp < b.timestamp; // Ordenar por timestamp
-    });
+    std::ofstream file(filename);
 
-    for (const auto& event : events) {
-        int sleep_time = event.timestamp - last_timestamp;
-        if (sleep_time > 0) {
-            file << "sleep_us(" << sleep_time << ")\n";
+    for (size_t i = 0; i < std::max(events.size(), mouse_events.size()); ++i) {
+        if (i < events.size()) {
+            const auto& event = events[i];
+            file << (event.is_press ? "holdKey(\"" : "releaseKey(\"")
+                 << event.key << "\")\n";
         }
-        if (event.type == "KEYBOARD") {
-            if (event.is_press) {
-                file << "holdKey(\"" << event.key << "\")\n";
-            } else {
-                file << "releaseKey(\"" << event.key << "\")\n";
-            }
-        } else if (event.type == "MOUSE") {
-            if (event.action == "MOVE") {
-                file << "mouseMove(" << event.x << ", " << event.y << ")\n";
-            } else if (event.action == "LEFT_CLICK") {
-                file << "mouseClick(\"LEFT\", " << event.x << ", " << event.y << ")\n";
-            } else if (event.action == "RIGHT_CLICK") {
-                file << "mouseClick(\"RIGHT\", " << event.x << ", " << event.y << ")\n";
-            }
+        if (i < mouse_events.size()) {
+            const auto& mouse_event = mouse_events[i];
+            file << "mouseMove(" << mouse_event.x << ", " << mouse_event.y
+                 << ")\n";
         }
-        last_timestamp = event.timestamp;
+        file << "sleep_us(" << sleep_duration_us << ")\n";
     }
 
     file.close();
-    LogToConsole("Inputs e mouse salvos em inputs_mouse.txt");
+    LogToConsole("Inputs salvos em " + std::string(filename));
 }
 
 // Mapear as teclas para nomes legíveis
@@ -86,11 +87,12 @@ std::string GetKeyName(int vk_code) {
     }
 }
 
-// Capturar inputs do teclado
+// Capturar inputs do teclado e mouse
 void CaptureInputs() {
     auto now = std::chrono::steady_clock::now();
     int current_time = std::chrono::duration_cast<std::chrono::microseconds>(now - recording_start).count();
 
+    // Captura do teclado
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         std::string key_name = GetKeyName(vk_code);
         if (key_name != "UNKNOWN") {
@@ -99,37 +101,24 @@ void CaptureInputs() {
             bool is_pressed = (GetAsyncKeyState(vk_code) & 0x8000) != 0;
             if (is_pressed && !key_states[key_name]) {
                 key_states[key_name] = true;
-                events.push_back({"KEYBOARD", key_name, true, "", 0, 0, current_time});
+                events.push_back({key_name, current_time, true});
                 LogToConsole("Tecla pressionada: " + key_name);
             } else if (!is_pressed && key_states[key_name]) {
                 key_states[key_name] = false;
-                events.push_back({"KEYBOARD", key_name, false, "", 0, 0, current_time});
+                events.push_back({key_name, current_time, false});
                 LogToConsole("Tecla liberada: " + key_name);
             }
         }
     }
-}
 
-// Capturar inputs do mouse
-void CaptureMouseInputs() {
-    auto now = std::chrono::steady_clock::now();
-    int current_time = std::chrono::duration_cast<std::chrono::microseconds>(now - recording_start).count();
-
-    POINT mouse_pos;
-    GetCursorPos(&mouse_pos);
-
-    static POINT last_mouse_pos = {0, 0};
-    if (mouse_pos.x != last_mouse_pos.x || mouse_pos.y != last_mouse_pos.y) {
-        events.push_back({"MOUSE", "", false, "MOVE", mouse_pos.x, mouse_pos.y, current_time});
-        last_mouse_pos = mouse_pos;
-    }
-
-    if (GetAsyncKeyState(VK_LBUTTON) & 0x8000) {
-        events.push_back({"MOUSE", "", true, "LEFT_CLICK", mouse_pos.x, mouse_pos.y, current_time});
-    }
-
-    if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) {
-        events.push_back({"MOUSE", "", true, "RIGHT_CLICK", mouse_pos.x, mouse_pos.y, current_time});
+    // Captura do mouse
+    if (capture_mouse) {
+        POINT p;
+        if (GetCursorPos(&p)) {
+            ScreenToClient(GetForegroundWindow(), &p);
+            mouse_events.push_back({p.x, p.y, current_time});
+            LogToConsole("Mouse em: (" + std::to_string(p.x) + ", " + std::to_string(p.y) + ")");
+        }
     }
 }
 
@@ -144,27 +133,43 @@ void render_gui() {
         if (is_recording) {
             recording_start = std::chrono::steady_clock::now();
             events.clear();
+            mouse_events.clear();
             LogToConsole("Gravacao iniciada");
         } else {
-            SaveInputsAndMouseToFile();
+            SaveInputsToFile();
             LogToConsole("Gravacao parada");
         }
     }
 
     ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
 
-    // Botão para ativar ou desativar captura do mouse
-    if (ImGui::Checkbox("Capturar Mouse", &capture_mouse)) {
-        LogToConsole(capture_mouse ? "Captura de mouse ativada" : "Captura de mouse desativada");
-    }
+    ImGui::Checkbox("Capturar Mouse", &capture_mouse);
 
     // Botão para limpar o console
     if (ImGui::Button("Limpar Console")) {
         console_logs.clear();
     }
 
+    // Botões para selecionar FPS
+    if (ImGui::Button("60fps (16670us)")) {
+        sleep_duration_us = 16670;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("59.94fps (16683us)")) {
+        sleep_duration_us = 16683;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("57.52416fps (17380us)")) {
+        sleep_duration_us = 17380;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("30fps (33333us)")) {
+        sleep_duration_us = 33333;
+    }
+
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
     }
@@ -173,13 +178,11 @@ void render_gui() {
 
     if (is_recording) {
         CaptureInputs();
-        if (capture_mouse) {
-            CaptureMouseInputs();
-        }
     }
 }
 
 int main() {
+    // Inicialização do GLFW
     if (!glfwInit())
         return -1;
 
