@@ -57,9 +57,9 @@ void SaveInputsToFile() {
             total_elapsed_us += frame_duration;
         }
         if (event.is_press) {
-            file << "holdKey(\"" << event.key << "\") // Timestamp: " << event.timestamp << " microseconds\n";
+            file << "holdKey(\"" << event.key << "\") -- Timestamp: " << event.timestamp << " microseconds\n";
         } else {
-            file << "releaseKey(\"" << event.key << "\") // Timestamp: " << event.timestamp << " microseconds\n";
+            file << "releaseKey(\"" << event.key << "\") -- Timestamp: " << event.timestamp << " microseconds\n";
         }
         total_elapsed_us = event.timestamp;
     }
