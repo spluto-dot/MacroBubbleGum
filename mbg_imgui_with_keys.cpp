@@ -41,36 +41,36 @@ void LogToConsole(const std::string& message) {
 
 // Função para salvar entradas no arquivo
 void SaveInputsToFile() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-    std::tm now_tm;
-#ifdef _WIN32
-    localtime_s(&now_tm, &now_time);
-#else
-    localtime_r(&now_time, &now_tm);
-#endif
-    char filename[32];
-    std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
+    std::ofstream file("inputs.txt");
+    int frame_duration = selected_frame_duration; // Duração do frame (ex: 16670)
+    int current_time = 0; // Tempo atual no arquivo de saída
 
-    std::ofstream file(filename);
-    for (size_t i = 0; i < key_events.size(); ++i) {
-        file << "sleep_us(" << frame_interval_us << ")\n";
+    for (const auto& event : events) {
+        // Gera os frames fixos até alcançar o próximo evento
+        while (current_time + frame_duration <= event.timestamp) {
+            file << "sleep_us(" << frame_duration << ")\n";
+            current_time += frame_duration; // Incrementa o tempo em steps fixos
+        }
 
-        // Registrar eventos de teclado
-        if (key_events[i].is_press) {
-            file << "holdKey(\"" << key_events[i].key << "\")\n";
+        // Escreve o evento de pressionar/soltar tecla
+        if (event.is_press) {
+            file << "holdKey(\"" << event.key << "\")\n";
         } else {
-            file << "releaseKey(\"" << key_events[i].key << "\")\n";
+            file << "releaseKey(\"" << event.key << "\")\n";
         }
 
-        // Registrar eventos de mouse, se habilitado
-        if (capture_mouse && i < mouse_events.size()) {
-            file << "mouseMove(" << mouse_events[i].x << ", " << mouse_events[i].y;
-            file << ", " << (mouse_events[i].left_click ? 1 : 0) << ", " << (mouse_events[i].right_click ? 1 : 0) << ")\n";
-        }
+        // Atualiza o tempo atual para o momento do evento
+        current_time = event.timestamp;
     }
+
+    // Preenche os frames restantes até o próximo múltiplo de `frame_duration`
+    while (current_time % frame_duration != 0) {
+        file << "sleep_us(" << frame_duration << ")\n";
+        current_time += frame_duration;
+    }
+
     file.close();
-    LogToConsole("Inputs salvos em " + std::string(filename));
+    LogToConsole("Inputs salvos em inputs.txt");
 }
 
 // Mapear as teclas para nomes legíveis
