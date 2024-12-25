@@ -17,53 +17,42 @@ std::vector<std::string> console_logs;
 // Estrutura para capturar entradas
 struct KeyEvent {
     std::string key;
-    int time_us;
+    int timestamp;
     bool is_press;
 };
 
 std::vector<KeyEvent> events;
 bool is_recording = false;
 bool capture_mouse = false;
+int frame_duration = 16670; // Default para 60fps
 std::chrono::steady_clock::time_point recording_start;
-int frame_duration = 16670; // Padrão: 60fps
 
 // Função para registrar logs no console
 void LogToConsole(const std::string& message) {
     console_logs.push_back(message);
-    if (console_logs.size() > 1000) {
-        console_logs.erase(console_logs.begin());
-    }
 }
 
 // Função para salvar entradas no arquivo
 void SaveInputsToFile() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-    std::tm now_tm;
-#ifdef _WIN32
-    localtime_s(&now_tm, &now_time);
-#else
-    localtime_r(&now_time, &now_tm);
-#endif
-    char filename[32];
-    std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
+    std::ofstream file("inputs.txt");
 
-    std::ofstream file(filename);
     int total_elapsed_us = 0;
     for (const auto& event : events) {
-        while (total_elapsed_us + frame_duration <= event.time_us) {
+        while (total_elapsed_us + frame_duration <= event.timestamp) {
             file << "sleep_us(" << frame_duration << ")\n";
             total_elapsed_us += frame_duration;
         }
+
         if (event.is_press) {
             file << "holdKey(\"" << event.key << "\")\n";
         } else {
             file << "releaseKey(\"" << event.key << "\")\n";
         }
-        total_elapsed_us = event.time_us;
+        total_elapsed_us = event.timestamp;
     }
+
     file.close();
-    LogToConsole("Inputs salvos em " + std::string(filename));
+    LogToConsole("Inputs salvos em inputs.txt");
 }
 
 // Mapear as teclas para nomes legíveis
@@ -85,7 +74,7 @@ std::string GetKeyName(int vk_code) {
 // Capturar inputs do teclado
 void CaptureInputs() {
     auto now = std::chrono::steady_clock::now();
-    int current_time_us = std::chrono::duration_cast<std::chrono::microseconds>(now - recording_start).count();
+    int current_time = std::chrono::duration_cast<std::chrono::microseconds>(now - recording_start).count();
 
     for (int vk_code = 0x01; vk_code <= 0xFE; ++vk_code) {
         std::string key_name = GetKeyName(vk_code);
@@ -94,23 +83,15 @@ void CaptureInputs() {
 
             bool is_pressed = (GetAsyncKeyState(vk_code) & 0x8000) != 0;
             if (is_pressed && !key_states[key_name]) {
-                // Tecla pressionada
                 key_states[key_name] = true;
-                events.push_back({key_name, current_time_us, true});
+                events.push_back({key_name, current_time, true});
                 LogToConsole("Tecla pressionada: " + key_name);
             } else if (!is_pressed && key_states[key_name]) {
-                // Tecla liberada
                 key_states[key_name] = false;
-                events.push_back({key_name, current_time_us, false});
+                events.push_back({key_name, current_time, false});
                 LogToConsole("Tecla liberada: " + key_name);
             }
         }
-    }
-
-    if (capture_mouse) {
-        POINT cursor_pos;
-        GetCursorPos(&cursor_pos);
-        events.push_back({"MOUSE_XY: " + std::to_string(cursor_pos.x) + "," + std::to_string(cursor_pos.y), current_time_us, true});
     }
 }
 
@@ -134,7 +115,17 @@ void render_gui() {
 
     ImGui::Text("Status: %s", is_recording ? "Gravando" : "Parado");
 
+    // Botão para capturar mouse
     ImGui::Checkbox("Capturar Mouse", &capture_mouse);
+
+    // Botões para alterar a duração dos frames
+    if (ImGui::Button("60fps (16670us)")) frame_duration = 16670;
+    ImGui::SameLine();
+    if (ImGui::Button("59.94fps (16683us)")) frame_duration = 16683;
+    ImGui::SameLine();
+    if (ImGui::Button("57.52416fps (17380us)")) frame_duration = 17380;
+    ImGui::SameLine();
+    if (ImGui::Button("30fps (33333us)")) frame_duration = 33333;
 
     // Botão para limpar o console
     if (ImGui::Button("Limpar Console")) {
@@ -143,9 +134,11 @@ void render_gui() {
 
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
-    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
+    }
+    if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+        ImGui::SetScrollHereY(1.0f); // Ajusta o scroll para acompanhar os logs
     }
     ImGui::EndChild();
     ImGui::End();
