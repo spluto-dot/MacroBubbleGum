@@ -25,6 +25,9 @@ std::vector<KeyEvent> events;
 bool is_recording = false;
 std::chrono::steady_clock::time_point recording_start;
 
+// Configuração inicial para microsegundos por frame
+int frame_time_us = 16670; // Padrão: 60fps
+
 // Função para registrar logs no console
 void LogToConsole(const std::string& message) {
     console_logs.push_back(message);
@@ -44,18 +47,23 @@ void SaveInputsToFile() {
     std::strftime(filename, sizeof(filename), "%Y%m%d%H%M%S.txt", &now_tm);
 
     std::ofstream file(filename);
-    int last_timestamp = 0;
+    int last_timestamp_us = 0;
     for (const auto& event : events) {
-        int sleep_time = event.timestamp - last_timestamp;
-        if (sleep_time > 0) {
-            file << "sleep(" << sleep_time << ")\n";
+        int sleep_time_us = (event.timestamp * 1000) - last_timestamp_us;
+        
+        // Inserir "sleep_us" no arquivo
+        if (sleep_time_us > 0) {
+            file << "sleep_us(" << frame_time_us << ")\n";
         }
+
+        // Registrar a tecla pressionada ou liberada
         if (event.is_press) {
             file << "holdKey(\"" << event.key << "\")\n";
         } else {
             file << "releaseKey(\"" << event.key << "\")\n";
         }
-        last_timestamp = event.timestamp;
+
+        last_timestamp_us += frame_time_us;
     }
     file.close();
     LogToConsole("Inputs salvos em " + std::string(filename));
@@ -73,18 +81,6 @@ std::string GetKeyName(int vk_code) {
         case VK_RIGHT: return "RIGHT";
         case VK_SPACE: return "SPACE";
         case VK_RETURN: return "ENTER";
-        case VK_F1: return "F1";
-        case VK_F2: return "F2";
-        case VK_F3: return "F3";
-        case VK_F4: return "F4";
-        case VK_F5: return "F5";
-        case VK_F6: return "F6";
-        case VK_F7: return "F7";
-        case VK_F8: return "F8";
-        case VK_F9: return "F9";
-        case VK_F10: return "F10";
-        case VK_F11: return "F11";
-        case VK_F12: return "F12";
         default: return "UNKNOWN";
     }
 }
@@ -146,24 +142,33 @@ void render_gui() {
         console_logs.clear();
     }
 
+    // Botões para alternar entre os tempos de frame
+    if (ImGui::Button("60fps (16670us)")) {
+        frame_time_us = 16670;
+        LogToConsole("Configurado para 60fps");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("59.94fps (16683us)")) {
+        frame_time_us = 16683;
+        LogToConsole("Configurado para 59.94fps");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("57.52416fps (17380us)")) {
+        frame_time_us = 17380;
+        LogToConsole("Configurado para 57.52416fps");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("30fps (33333us)")) {
+        frame_time_us = 33333;
+        LogToConsole("Configurado para 30fps");
+    }
+
     ImGui::Text("Console:");
     ImGui::BeginChild("ConsoleLogs", ImVec2(0, 200), true, ImGuiWindowFlags_HorizontalScrollbar);
-    
-    // Verificar se o usuário está interagindo com o scroll
-    float scroll_y = ImGui::GetScrollY();
-    float scroll_max_y = ImGui::GetScrollMaxY();
-    bool should_auto_scroll = (scroll_y >= scroll_max_y - 1.0f);
-    
-    // Adicionar os logs
+    ImGui::SetScrollHereY(1.0f); // Ajustar o scroll para acompanhar o texto
     for (const auto& log : console_logs) {
         ImGui::TextUnformatted(log.c_str());
     }
-    
-    // Apenas rolar automaticamente se o scroll estiver no final
-    if (should_auto_scroll) {
-        ImGui::SetScrollHereY(1.0f);
-    }
-    
     ImGui::EndChild();
     ImGui::End();
 
