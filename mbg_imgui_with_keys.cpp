@@ -75,6 +75,7 @@ std::string GetKeyName(int vk_code) {
         case VK_RIGHT: return "RIGHT";
         case VK_SPACE: return "SPACE";
         case VK_RETURN: return "ENTER";
+        case VK_PAUSE: return "PAUSE"; // Adicionado suporte para a tecla Pause
         default: return "UNKNOWN";
     }
 }
@@ -91,12 +92,10 @@ void CaptureInputs() {
 
             bool is_pressed = (GetAsyncKeyState(vk_code) & 0x8000) != 0;
             if (is_pressed && !key_states[key_name]) {
-                // Tecla pressionada
                 key_states[key_name] = true;
                 events.push_back({key_name, current_time, true});
                 LogToConsole("Tecla pressionada: " + key_name);
             } else if (!is_pressed && key_states[key_name]) {
-                // Tecla liberada
                 key_states[key_name] = false;
                 events.push_back({key_name, current_time, false});
                 LogToConsole("Tecla liberada: " + key_name);
